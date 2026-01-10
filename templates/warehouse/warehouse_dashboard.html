@@ -1,7 +1,76 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+
 {% block content %}
-<div class="max-w-xl mx-auto bg-white rounded-lg shadow-lg p-8 mt-8">
-    <h2 class="text-2xl font-bold mb-4 text-center">Warehouse Dashboard</h2>
-    <p class="text-center text-gray-700">Welcome, Warehouse! This is your dashboard.</p>
+<h1 class="text-2xl font-bold mb-6">Warehouse Admin – Route Planner</h1>
+
+<form method="POST" action="/warehouse/analyze-routes" class="mb-6">
+  <button class="bg-blue-600 text-white px-4 py-2 rounded">
+    Analyze Routes
+  </button>
+</form>
+
+{% for cluster in clusters %}
+<div class="border rounded p-4 mb-6 bg-gray-50">
+
+  <div class="flex justify-between mb-2">
+    <div>
+      <p><b>Total Weight:</b> {{ cluster.total_weight }} kg</p>
+      <p><b>Users:</b> {{ cluster.user_count }}</p>
+      <p><b>Radius Used:</b> {{ cluster.radius_used_km }} km</p>
+      <p><b>Status:</b>
+        <span class="font-semibold text
+          {% if cluster.status == 'ready' %}green
+          {% elif cluster.status == 'almost_ready' %}yellow
+          {% else %}red{% endif %}">
+          {{ cluster.status }}
+        </span>
+      </p>
+    </div>
+
+    <div>
+      {% if cluster.status == "ready" %}
+        <button class="bg-green-600 text-white px-3 py-1 rounded">
+          Assign Engineer & Driver
+        </button>
+      {% elif cluster.status == "almost_ready" %}
+        <form method="POST" action="/warehouse/approve/{{ cluster._id }}">
+          <button class="bg-yellow-600 text-white px-3 py-1 rounded">
+            Approve (85kg+) & Assign
+          </button>
+        </form>
+      {% else %}
+        <p class="text-gray-500">Waiting for more users</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <hr class="my-3">
+
+  <p class="font-semibold mb-2">Users in this Route:</p>
+  <table class="w-full border text-sm">
+    <thead class="bg-gray-200">
+      <tr>
+        <th class="border p-1">Name</th>
+        <th class="border p-1">Address</th>
+        <th class="border p-1">Weight (kg)</th>
+        <th class="border p-1">Distance (km)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in cluster.user_details %}
+      <tr>
+        <td class="border p-1">{{ u.name }}</td>
+        <td class="border p-1">{{ u.address }}</td>
+        <td class="border p-1">{{ u.weight }}</td>
+        <td class="border p-1">{{ u.distance }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
 </div>
+{% else %}
+<p>No clusters created yet.</p>
+{% endfor %}
+
 {% endblock %}

@@ -1,0 +1,14 @@
+# Python bytecode
+_pycache_/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/

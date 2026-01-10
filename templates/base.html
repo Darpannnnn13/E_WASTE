@@ -3,20 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Module Test</title>
+    <title>E-Waste Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen p-4 md:p-8">
-    <nav class="mb-8 flex justify-between">
-        <a href="/" class="font-bold text-green-700 text-xl">♻️ E-Waste App</a>
-        <div>
-            {% if session.get('role') == 'user' %}
-                <span class="text-gray-500 mr-4">Logged in as User</span>
-            {% endif %}
+<body class="bg-gray-50 text-gray-800">
+    <nav class="bg-white shadow p-4 mb-6">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="/" class="font-bold text-xl text-green-600">E-Waste App</a>
+            <div>
+                {% if session.get('user_id') %}
+                    <span class="mr-4 text-sm font-semibold text-gray-600">Role: {{ session.get('role')|upper }}</span>
+                    <a href="/logout" class="text-red-500 hover:underline text-sm">Logout</a>
+                {% endif %}
+            </div>
         </div>
     </nav>
-    
-    {% block content %}{% endblock %}
 
+    <div class="container mx-auto px-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-4">{{ messages[0] }}</div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </div>
 </body>
 </html>
