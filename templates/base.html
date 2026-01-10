@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}E-Waste System{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-white shadow mb-6">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <span class="font-bold text-xl">E-Waste System</span>
+            <div class="flex items-center space-x-4">
+                {% if session['role'] == 'user' %}
+                    <a href="/user/request" class="text-blue-600 hover:underline">Request Pickup</a>
+                {% elif session['role'] == 'engineer' %}
+                    <a href="/engineer/dashboard" class="text-blue-600 hover:underline">Engineer Dashboard</a>
+                {% elif session['role'] == 'warehouse' %}
+                    <a href="/warehouse/dashboard" class="text-blue-600 hover:underline">Warehouse Dashboard</a>
+                {% endif %}
+                {% if session['role'] %}
+                    <a href="/all_users" class="text-green-600 hover:underline">All Users Page</a>
+                {% endif %}
+                {% if session['role'] %}
+                    <span class="text-gray-600">Role: {{ session['role']|capitalize }}</span>
+                    <a href="/logout" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Logout</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    <main class="container mx-auto px-4">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
