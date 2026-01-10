@@ -171,7 +171,7 @@
       <h3 class="font-bold mb-2 text-gray-700">Item 1</h3>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input name="ewaste_type[]" required placeholder="Type (e.g. Laptop)" class="p-3 w-full">
-        <input name="weight[]" type="number" required placeholder="Weight (g)" class="p-3 w-full weight-input" oninput="calculateTotal()">
+        <input name="weight[]" type="number" required placeholder="Weight (grams)" class="p-3 w-full weight-input" oninput="calculateTotal()">
         <input type="file" name="images[]" accept="image/*" multiple class="p-3 w-full bg-gray-50">
         <input name="item_description[]" placeholder="Specific details (e.g. Broken screen)" class="p-3 w-full">
       </div>
@@ -186,7 +186,7 @@
     
     <div class="text-xl">
       <span class="text-gray-700 font-bold">Total Weight:</span>
-      <span id="display-total" class="text-2xl font-bold text-[#3BC1A8]">0</span> g
+      <span id="display-total" class="text-2xl font-bold text-[#3BC1A8]">0</span> grams
     </div>
   </div>
 
@@ -215,6 +215,15 @@
     <div>
         <p class="text-lg font-bold text-[#005461]">{{ r.ewaste_type }}</p>
         <p class="text-sm text-gray-500 mt-1">{{ r.created_at.strftime('%Y-%m-%d') }} • {{ r.area }}</p>
+        {% if r['items'] %}
+        <div class="mt-2 flex flex-wrap gap-2">
+            {% for item in r['items'] %}
+            <span class="text-xs bg-gray-50 border border-gray-200 text-gray-600 px-2 py-1 rounded">
+                <b>{{ item.type }}</b>: {{ item.weight }} grams
+            </span>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
     <div class="text-right">
         <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide
@@ -224,7 +233,7 @@
         {% else %}bg-yellow-100 text-yellow-800{% endif %}">
           {{ r.status }}
         </span>
-        <p class="mt-2 font-semibold text-gray-600">{{ r.approx_weight }} g</p>
+        <p class="mt-2 font-semibold text-gray-600">{{ r.approx_weight }} grams</p>
     </div>
   </div>
 
