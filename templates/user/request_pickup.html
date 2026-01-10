@@ -139,6 +139,15 @@
     <label class="block text-sm font-bold text-gray-700 mb-2">
       Select Pickup Location (South Mumbai)
     </label>
+    
+    <!-- Search Bar -->
+    <div class="mb-3 relative">
+        <input type="text" id="map-search" placeholder="Start typing to search (e.g. Colaba Market)..." 
+               class="p-3 w-full border-2 border-gray-200 rounded-lg focus:border-[#3BC1A8] outline-none pr-24"
+               oninput="debouncedSearch()">
+        <div id="search-status" class="absolute right-3 top-3.5 text-gray-400 text-sm font-medium pointer-events-none"></div>
+    </div>
+
     <div id="map" class="h-64 w-full rounded border border-gray-300 z-0"></div>
     <button type="button" onclick="detectLocation()" class="mt-3 text-sm text-[#005461] hover:text-[#3BC1A8] font-bold flex items-center transition-colors">
       📍 Detect My Current Location
@@ -162,7 +171,7 @@
       <h3 class="font-bold mb-2 text-gray-700">Item 1</h3>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input name="ewaste_type[]" required placeholder="Type (e.g. Laptop)" class="p-3 w-full">
-        <input name="weight[]" type="number" required placeholder="Weight (kg)" class="p-3 w-full weight-input" oninput="calculateTotal()">
+        <input name="weight[]" type="number" required placeholder="Weight (g)" class="p-3 w-full weight-input" oninput="calculateTotal()">
         <input type="file" name="images[]" accept="image/*" multiple class="p-3 w-full bg-gray-50">
         <input name="item_description[]" placeholder="Specific details (e.g. Broken screen)" class="p-3 w-full">
       </div>
@@ -177,7 +186,7 @@
     
     <div class="text-xl">
       <span class="text-gray-700 font-bold">Total Weight:</span>
-      <span id="display-total" class="text-2xl font-bold text-[#3BC1A8]">0</span> kg
+      <span id="display-total" class="text-2xl font-bold text-[#3BC1A8]">0</span> g
     </div>
   </div>
 
@@ -215,7 +224,7 @@
         {% else %}bg-yellow-100 text-yellow-800{% endif %}">
           {{ r.status }}
         </span>
-        <p class="mt-2 font-semibold text-gray-600">{{ r.approx_weight }} kg</p>
+        <p class="mt-2 font-semibold text-gray-600">{{ r.approx_weight }} g</p>
     </div>
   </div>
 
@@ -450,12 +459,75 @@
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input name="ewaste_type[]" required placeholder="Type (e.g. Laptop)" class="p-3 w-full border-2 border-gray-200 rounded-lg">
-            <input name="weight[]" type="number" required placeholder="Weight (kg)" class="p-3 w-full weight-input border-2 border-gray-200 rounded-lg" oninput="calculateTotal()">
+            <input name="weight[]" type="number" required placeholder="Weight (g)" class="p-3 w-full weight-input border-2 border-gray-200 rounded-lg" oninput="calculateTotal()">
             <input type="file" name="images[]" accept="image/*" multiple class="p-3 w-full bg-gray-50 border-2 border-gray-200 rounded-lg">
             <input name="item_description[]" placeholder="Specific details" class="p-3 w-full border-2 border-gray-200 rounded-lg">
           </div>
       `;
       container.appendChild(div);
+  }
+
+  // 9. Search Location Logic
+  let debounceTimer;
+  
+  function debouncedSearch() {
+      const query = document.getElementById('map-search').value;
+      const status = document.getElementById('search-status');
+      
+      if (!query) {
+          status.innerText = '';
+          return;
+      }
+      
+      status.innerText = 'Typing...';
+      status.className = 'absolute right-3 top-3.5 text-gray-400 text-sm font-medium pointer-events-none';
+
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+          searchLocation();
+      }, 1000); // 1 second delay to prevent API spam
+  }
+
+  async function searchLocation() {
+      const query = document.getElementById('map-search').value;
+      const status = document.getElementById('search-status');
+      
+      if (!query) return;
+
+      status.innerText = 'Searching...';
+      status.className = 'absolute right-3 top-3.5 text-blue-500 text-sm font-medium pointer-events-none';
+
+      // Append 'Mumbai' to ensure results are local
+      const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' Mumbai')}&limit=1`;
+
+      try {
+          const response = await fetch(searchUrl);
+          const data = await response.json();
+          
+          if (data && data.length > 0) {
+              const lat = parseFloat(data[0].lat);
+              const lon = parseFloat(data[0].lon);
+              
+              // Validate bounds (using existing polygon logic)
+              if (isPointInPolygon([lat, lon], mumbaiPolygon)) {
+                  const latlng = L.latLng(lat, lon);
+                  map.setView(latlng, 16);
+                  placeMarker(latlng); // This will snap to road and fill address
+                  status.innerText = 'Found';
+                  status.className = 'absolute right-3 top-3.5 text-green-600 text-sm font-bold pointer-events-none';
+              } else {
+                  status.innerText = 'Outside Area';
+                  status.className = 'absolute right-3 top-3.5 text-red-500 text-sm font-bold pointer-events-none';
+              }
+          } else {
+              status.innerText = 'Not Found';
+              status.className = 'absolute right-3 top-3.5 text-gray-500 text-sm pointer-events-none';
+          }
+      } catch (e) {
+          console.error("Search error:", e);
+          status.innerText = 'Error';
+          status.className = 'absolute right-3 top-3.5 text-red-500 text-sm pointer-events-none';
+      }
   }
 </script>
 {% endblock %}

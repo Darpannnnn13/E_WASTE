@@ -45,7 +45,7 @@ def create_request():
         
         # Create detailed description breakdown
         general_desc = request.form.get('description', '')
-        details = "; ".join([f"{t} ({w}kg): {d}" for t, w, d in zip(types, weights, item_descs) if t])
+        details = "; ".join([f"{t} ({w}g): {d}" for t, w, d in zip(types, weights, item_descs) if t])
         final_description = f"{general_desc}\n[Details]: {details}" if details else general_desc
 
         # Create structured items list for database
