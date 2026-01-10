@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | E-Waste System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom ring color to match your palette */
+        .focus-ring:focus {
+            --tw-ring-color: #3BC1A8;
+            border-color: #005461;
+        }
+    </style>
+</head>
+<body class="bg-[#F0FFDF] flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md bg-white border border-[#3BC1A8] rounded-xl shadow-xl p-8 transition-all">
+        
+        <div class="text-center mb-8">
+            <h2 class="text-3xl font-bold text-[#005461]">Login</h2>
+            <p class="text-[#3BC1A8] mt-2">Manage your e-waste responsibly</p>
+        </div>
+
+        {% if error %}
+            <div class="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded mb-6 text-sm">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <form method="POST" action="/login" class="space-y-5">
+            <div>
+                <label for="email" class="block text-sm font-semibold text-[#005461] mb-1">Email Address</label>
+                <input type="email" name="email" id="email" required 
+                       class="w-full px-4 py-2 border border-[#3BC1A8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3BC1A8] focus:border-transparent transition-all"
+                       placeholder="name@example.com">
+            </div>
+
+            <div>
+                <label for="password" class="block text-sm font-semibold text-[#005461] mb-1">Password</label>
+                <input type="password" name="password" id="password" required 
+                       class="w-full px-4 py-2 border border-[#3BC1A8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3BC1A8] focus:border-transparent transition-all"
+                       placeholder="••••••••">
+            </div>
+
+            <button type="submit" 
+                    class="w-full bg-[#3BC1A8] text-white font-bold py-3 rounded-lg hover:bg-[#005461] transform hover:-translate-y-0.5 transition-all shadow-md">
+                Sign In
+            </button>
+        </form>
+
+        <div class="mt-8 pt-6 border-t border-gray-100 text-center">
+            <p class="text-gray-600 text-sm">
+                New to the system? 
+                <a href="/register" class="text-[#005461] font-bold hover:underline">Create Account</a>
+            </p>
+        </div>
+    </div>
+
+</body>
+</html>

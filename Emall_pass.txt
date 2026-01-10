@@ -1,0 +1,15 @@
+User:
+Email: user@example.com
+Password: userpass
+
+Admin:
+Email: admin@example.com
+Password: adminpass
+
+Engineer:
+Email: engineer@example.com
+Password: engineerpass
+
+Warehouse:
+Email: warehouse@example.com
+Password: warehousepass
