@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto mt-8 fade-in-up">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-[#005461]">My Invoices & Earnings</h1>
+            <p class="text-gray-500">Track your payments and distributions</p>
+        </div>
+        <div class="glass px-6 py-3 rounded-xl border border-[#3BC1A8] text-[#005461]">
+            <span class="text-sm font-bold uppercase">Total Earnings</span>
+            <div class="text-2xl font-bold">₹{{ invoices|sum(attribute='amount')|round(2) }}</div>
+        </div>
+    </div>
+
+    {% if pending_items %}
+    <div class="mb-10 fade-in-up" style="animation-delay: 100ms;">
+        <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center gap-2">
+            <span>⏳</span> In-Process / Pending Payment
+        </h2>
+        <div class="glass rounded-2xl overflow-hidden shadow-sm border border-white/50">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-yellow-50 text-yellow-800 uppercase text-xs font-bold tracking-wider">
+                    <tr>
+                        <th class="p-4">Item / Description</th>
+                        <th class="p-4">Date</th>
+                        <th class="p-4">Current Status</th>
+                        <th class="p-4">Est. Share</th>
+                        <th class="p-4 text-right">Est. Amount</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100/50 text-sm">
+                    {% for item in pending_items %}
+                    <tr class="hover:bg-white/40 transition-colors">
+                        <td class="p-4 font-medium text-gray-800">
+                            {{ item.ewaste_type }}
+                            <div class="text-xs text-gray-500">{{ item.area }}</div>
+                        </td>
+                        <td class="p-4 text-gray-600">{{ item.created_at.strftime('%d %b %Y') if item.created_at else 'N/A' }}</td>
+                        <td class="p-4">
+                            <span class="px-2 py-1 rounded text-xs font-bold uppercase
+                                {% if item.status == 'collected' %}bg-green-100 text-green-800
+                                {% elif item.status == 'out_for_delivery' %}bg-purple-100 text-purple-800
+                                {% elif item.status == 'assigned' %}bg-blue-100 text-blue-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ item.status }}
+                            </span>
+                        </td>
+                        <td class="p-4">
+                            <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-bold">{{ item.share_percentage }}</span>
+                        </td>
+                        <td class="p-4 text-right font-bold text-gray-500">~ ₹{{ item.estimated_share }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if invoices %}
+    <h2 class="text-xl font-bold text-[#005461] mb-4 flex items-center gap-2 fade-in-up" style="animation-delay: 200ms;">
+        <span>✓</span> Paid Invoices
+    </h2>
+    <div class="glass rounded-2xl overflow-hidden shadow-sm border border-white/50 fade-in-up" style="animation-delay: 200ms;">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-[#005461]/5 text-[#005461] uppercase text-xs font-bold tracking-wider">
+                <tr>
+                    <th class="p-4">Invoice #</th>
+                    <th class="p-4">Date</th>
+                    <th class="p-4">Description</th>
+                    <th class="p-4">Role Share</th>
+                    <th class="p-4 text-right">Amount</th>
+                    <th class="p-4 text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100/50 text-sm">
+                {% for inv in invoices %}
+                <tr class="hover:bg-white/40 transition-colors">
+                    <td class="p-4 font-mono text-gray-600">{{ inv.invoice_number }}</td>
+                    <td class="p-4 text-gray-600">{{ inv.created_at.strftime('%d %b %Y') }}</td>
+                    <td class="p-4 font-medium text-gray-800">{{ inv.description }}</td>
+                    <td class="p-4">
+                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{{ inv.percentage }}</span>
+                    </td>
+                    <td class="p-4 text-right font-bold text-[#005461]">₹{{ inv.amount }}</td>
+                    <td class="p-4 text-center">
+                        <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-bold">PAID</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="glass p-12 rounded-2xl text-center border-2 border-dashed border-gray-300">
+        <div class="text-6xl mb-4 opacity-20">🧾</div>
+        <h3 class="text-xl font-bold text-gray-600">No Invoices Found</h3>
+        <p class="text-gray-500 mt-2">Payments distributed to you will appear here.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

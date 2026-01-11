@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <div class="container mx-auto px-4 py-8 h-full overflow-y-auto fade-in-up">
     <h1 class="text-4xl font-bold text-[#005461] mb-8">♻️ Recycler Dashboard</h1>
 
@@ -63,59 +62,143 @@
     </div>
 </div>
 
+<!-- SIMULATED PAYMENT GATEWAY MODAL -->
+<div id="paymentModal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center backdrop-blur-sm transition-opacity duration-300">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 border border-white/20">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-[#005461] to-[#3BC1A8] p-6 text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-4 opacity-10 text-6xl">💳</div>
+            <h3 class="text-xl font-bold flex items-center gap-2 relative z-10">
+                <span>🔒</span> Secure Payment Gateway
+            </h3>
+            <p class="text-white/80 text-sm mt-1 relative z-10">EcoConnect Automated Clearing House</p>
+        </div>
+        
+        <!-- Body -->
+        <div class="p-6 space-y-5">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-4">
+                <span class="text-gray-500 font-medium">Beneficiary User</span>
+                <span class="font-bold text-gray-800 text-lg" id="payUser">Loading...</span>
+            </div>
+            
+            <div class="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Automated Split Breakdown</p>
+                <div class="flex justify-between text-sm items-center">
+                    <span class="text-gray-600">👤 User Share (50%)</span>
+                    <span class="font-mono font-bold text-gray-800" id="shareUser">₹0</span>
+                </div>
+                <div class="flex justify-between text-sm items-center">
+                    <span class="text-gray-600">🚚 Driver Share (10%)</span>
+                    <span class="font-mono font-bold text-gray-800" id="shareDriver">₹0</span>
+                </div>
+                <div class="flex justify-between text-sm items-center">
+                    <span class="text-gray-600">👷 Engineer Share (15%)</span>
+                    <span class="font-mono font-bold text-gray-800" id="shareEngineer">₹0</span>
+                </div>
+                <div class="flex justify-between text-sm items-center">
+                    <span class="text-gray-600">🏭 Warehouse Share (25%)</span>
+                    <span class="font-mono font-bold text-gray-800" id="shareWarehouse">₹0</span>
+                </div>
+            </div>
+            
+            <div class="flex justify-between items-center pt-2">
+                <span class="font-bold text-gray-700 text-lg">Total Payable</span>
+                <span class="text-3xl font-extrabold text-[#005461]" id="payAmount">₹0</span>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
+            <button onclick="closePaymentModal()" class="flex-1 px-4 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-200 transition">Cancel</button>
+            <button onclick="confirmPayment()" id="confirmBtn" class="flex-1 px-4 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-green-600 to-green-700 hover:shadow-lg hover:scale-[1.02] transition-all flex justify-center items-center gap-2">
+                <span>💸</span> Pay Now
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
+let currentPickupId = null;
+
 async function initiatePayment(pickupId) {
+    currentPickupId = pickupId;
+    const modal = document.getElementById('paymentModal');
+    const confirmBtn = document.getElementById('confirmBtn');
+    
+    // Reset UI
+    confirmBtn.innerHTML = '<span>💸</span> Pay Now';
+    confirmBtn.disabled = false;
+    
     try {
-        // 1. Create Order
-        const response = await fetch(`/payment/initiate/${pickupId}`, { method: 'POST' });
+        // Fetch payment preview details
+        const response = await fetch(`/payment/preview/${pickupId}`);
         const data = await response.json();
         
         if (data.error) {
             alert(data.error);
             return;
         }
-        
-        if (data.key_id === 'rzp_test_123456789') {
-            alert("Error: Invalid Razorpay API Key. Please check your .env file configuration.");
-            return;
-        }
 
-        // 2. Open Razorpay
-        const options = {
-            "key": data.key_id,
-            "amount": data.amount,
-            "currency": "INR",
-            "name": "E-Waste Recycling",
-            "description": "Payment for collected e-waste",
-            "order_id": data.order_id,
-            "handler": async function (response){
-                // 3. Verify Payment
-                const verifyRes = await fetch('/payment/verify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        razorpay_payment_id: response.razorpay_payment_id,
-                        razorpay_order_id: response.razorpay_order_id,
-                        razorpay_signature: response.razorpay_signature,
-                        pickup_id: data.pickup_id
-                    })
-                });
-                const verifyData = await verifyRes.json();
-                if (verifyData.success) {
-                    alert("Payment Successful! Funds distributed and invoices generated.");
-                    location.reload();
-                } else {
-                    alert("Payment Verification Failed");
-                }
-            },
-            "prefill": { "name": data.user_name, "email": data.email },
-            "theme": { "color": "#005461" }
-        };
-        const rzp1 = new Razorpay(options);
-        rzp1.open();
+        // Populate Modal
+        document.getElementById('payUser').innerText = data.user_name || 'Unknown User';
+        document.getElementById('payAmount').innerText = '₹' + data.amount;
+        
+        document.getElementById('shareUser').innerText = '₹' + data.splits.user;
+        document.getElementById('shareDriver').innerText = '₹' + data.splits.driver;
+        document.getElementById('shareEngineer').innerText = '₹' + data.splits.engineer;
+        document.getElementById('shareWarehouse').innerText = '₹' + data.splits.warehouse;
+
+        // Show Modal
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
     } catch (e) {
         console.error(e);
-        alert("Error initiating payment");
+        alert("Error loading payment details");
+    }
+}
+
+function closePaymentModal() {
+    const modal = document.getElementById('paymentModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function confirmPayment() {
+    if (!currentPickupId) return;
+    
+    const confirmBtn = document.getElementById('confirmBtn');
+    confirmBtn.innerHTML = '<span>⏳</span> Processing...';
+    confirmBtn.disabled = true;
+
+    try {
+        const response = await fetch('/payment/confirm-simulated', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pickup_id: currentPickupId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            confirmBtn.innerHTML = '<span>✓</span> Success!';
+            confirmBtn.classList.remove('from-green-600', 'to-green-700');
+            confirmBtn.classList.add('from-emerald-500', 'to-emerald-600');
+            
+            setTimeout(() => {
+                alert(`Payment Successful!\nTransaction ID: ${data.transaction_id}\n\nInvoices have been generated for all stakeholders.`);
+                location.reload();
+            }, 500);
+        } else {
+            alert('Payment Failed: ' + (data.error || 'Unknown error'));
+            confirmBtn.innerHTML = '<span>💸</span> Pay Now';
+            confirmBtn.disabled = false;
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Network error occurred");
+        confirmBtn.innerHTML = '<span>💸</span> Pay Now';
+        confirmBtn.disabled = false;
     }
 }
 </script>

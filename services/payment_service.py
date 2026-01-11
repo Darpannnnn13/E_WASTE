@@ -16,7 +16,7 @@ class PaymentService:
         self.key_secret = os.getenv('RAZORPAY_KEY_SECRET')
         
         if not self.key_id or not self.key_secret or self.key_id.startswith('paste_your'):
-            print("WARNING: Razorpay keys not found in .env. Using dummy keys (Payments will fail).")
+            print("INFO: Razorpay keys not found. Using Simulated Payment Gateway mode.")
             self.key_id = 'rzp_test_123456789'
             self.key_secret = 'secret_123456789'
         
