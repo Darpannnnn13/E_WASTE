@@ -31,8 +31,37 @@ def dashboard():
     weight_res = list(mongo.db.pickup_requests.aggregate(pipeline))
     total_donated = weight_res[0]['total'] if weight_res else 0
 
-    return render_template('user/dashboard.html', requests=requests, total_donated=total_donated)
+    # Rewards: 1 Point per 100g
+    points = int(total_donated / 100)
 
+    # Leaderboard: Top 5 users by total weight
+    leaderboard_pipeline = [
+        {'$group': {'_id': '$user_name', 'total_weight': {'$sum': {'$ifNull': ['$approx_weight', '$ewaste_weight']}}}},
+        {'$sort': {'total_weight': -1}},
+        {'$limit': 5}
+    ]
+    leaderboard = list(mongo.db.pickup_requests.aggregate(leaderboard_pipeline))
+
+    # Define available rewards (for example)
+    rewards = [
+        {'name': '10% Discount Coupon', 'cost': 500, 'code': 'ECO10'},
+        {'name': 'Free E-Waste Pickup', 'cost': 1000, 'code': 'ECOFREE'},
+        {'name': 'Sustainable Gift Pack', 'cost': 2000, 'code': 'ECOGIFT'}
+    ]
+
+    # Determine which rewards user can afford
+    affordable_rewards = []
+    for reward in rewards:
+        if points >= reward['cost']:
+            affordable_rewards.append(reward)
+
+    return render_template(
+        'user/dashboard.html',
+        requests=requests,
+        total_donated=total_donated,
+        points=points,
+        leaderboard=leaderboard,
+        rewards=affordable_rewards)
 
 @user_bp.route('/request', methods=['GET', 'POST'])
 def create_request():
@@ -124,8 +153,8 @@ def create_request():
         
         # ============ AUTO-CLUSTER FORMATION ============
         CLUSTER_RADIUS_KM = 15
-        CLUSTER_MIN_WEIGHT = 50
-        CLUSTER_MAX_WEIGHT = 150
+        CLUSTER_MIN_WEIGHT = 100000  # 100kg in grams
+        CLUSTER_MAX_WEIGHT = 1000000 # 1000kg in grams
         
         lat_pickup = float(lat) if lat else None
         lng_pickup = float(lng) if lng else None

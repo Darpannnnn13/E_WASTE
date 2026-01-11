@@ -83,6 +83,14 @@ def dashboard():
     # 5. Warehouse Inventory (Collected items waiting for recycling)
     inventory_items = list(mongo.db.pickup_requests.find({"status": "collected"}).sort("updated_at", -1).limit(10))
 
+    # 6. Leaderboard
+    leaderboard_pipeline = [
+        {'$group': {'_id': '$user_name', 'total_weight': {'$sum': {'$ifNull': ['$approx_weight', '$ewaste_weight']}}}},
+        {'$sort': {'total_weight': -1}},
+        {'$limit': 5}
+    ]
+    leaderboard = list(mongo.db.pickup_requests.aggregate(leaderboard_pipeline))
+
     # attach user details and category/type info for each cluster
     for cluster in clusters:
         users = []
@@ -149,7 +157,8 @@ def dashboard():
             "engineers": engineers,
             "drivers": drivers,
             "recyclers": recyclers,
-            "inventory": inventory_items
+            "inventory": inventory_items,
+            "leaderboard": leaderboard
         },
         warehouses=WAREHOUSES
     )
@@ -233,6 +242,9 @@ def analyze_routes():
         "cluster_id": None
     }))
 
+    # Filter out requests with missing coordinates to prevent KeyError
+    users = [u for u in users if u.get('latitude') is not None and u.get('longitude') is not None]
+
     # Sort by weight (handle both field names for compatibility)
     users.sort(key=lambda u: u.get("approx_weight", u.get("ewaste_weight", 0)), reverse=True)
 
@@ -285,12 +297,12 @@ def analyze_routes():
                 max_distance = max(max_distance, dist)
                 used_users.add(u["_id"])
 
-            if total_weight >= 100:
+            if total_weight >= 100000: # 100kg limit for cluster
                 break
 
-        if total_weight >= 100:
+        if total_weight >= 100000: # 100kg -> Ready
             status = "ready"
-        elif total_weight >= 85:
+        elif total_weight >= 80000: # 80kg -> Almost Ready
             status = "almost_ready"
         else:
             status = "pending"
@@ -313,126 +325,6 @@ def analyze_routes():
             "created_at": datetime.utcnow()
         }
 
-
-        @warehouse_bp.route('/assign/<cluster_id>', methods=['GET'])
-        def assign_cluster_page(cluster_id):
-            # Render a simple assignment page for a cluster
-            cluster = mongo.db.collection_clusters.find_one({'_id': ObjectId(cluster_id)})
-            if not cluster:
-                return redirect(url_for('warehouse.dashboard'))
-
-            # Fetch available engineers/drivers/doctors
-            engineers = list(mongo.db.users.find({'role': 'engineer'}))
-            drivers = list(mongo.db.users.find({'role': 'driver'}))
-            doctors = list(mongo.db.users.find({'role': 'doctor'}))
-
-            # Determine cluster centroid (anchor or centroid of users)
-            lat = None
-            lng = None
-            if cluster.get('anchor_location'):
-                lat = cluster['anchor_location'].get('lat')
-                lng = cluster['anchor_location'].get('lng')
-            else:
-                user_ids = [u['user_id'] for u in cluster.get('users', [])]
-                if user_ids:
-                    pickup_docs = list(mongo.db.pickup_requests.find({'_id': {'$in': user_ids}}))
-                    if pickup_docs:
-                        lat = sum([p.get('latitude', 0) for p in pickup_docs]) / len(pickup_docs)
-                        lng = sum([p.get('longitude', 0) for p in pickup_docs]) / len(pickup_docs)
-
-            # Only show engineers who are available_tomorrow or currently not on route
-            active_engineer_ids = mongo.db.collection_clusters.distinct('engineer_id', {'status': {'$in': ['in_progress', 'assigned', 'scheduled']}})
-            for eng in engineers:
-                eng['on_route'] = str(eng['_id']) in active_engineer_ids
-                eng['available_tomorrow'] = eng.get('available_tomorrow', True)
-                # compute current active assignment count for workload-based recommendation
-                try:
-                    eng_count = mongo.db.collection_clusters.count_documents({'engineer_id': str(eng['_id']), 'status': {'$in': ['assigned', 'in_progress', 'scheduled']}})
-                except Exception:
-                    eng_count = 0
-                eng['active_count'] = eng_count
-
-            for drv in drivers:
-                try:
-                    drv_count = mongo.db.collection_clusters.count_documents({'driver_id': str(drv['_id']), 'status': {'$in': ['assigned', 'in_progress', 'scheduled']}})
-                except Exception:
-                    drv_count = 0
-                drv['active_count'] = drv_count
-
-            # Sort by availability then by active_count (less loaded first)
-            engineers_sorted = sorted(engineers, key=lambda p: (0 if p.get('available_tomorrow', True) else 1, p.get('active_count', 0)))
-            drivers_sorted = sorted(drivers, key=lambda p: (0 if p.get('available_tomorrow', True) else 1, p.get('active_count', 0)))
-
-            # Prepare recommended (top 5)
-            recommended_engineers = engineers_sorted[:5]
-            recommended_drivers = drivers_sorted[:5]
-
-            recommended_engineer_id = str(recommended_engineers[0]['_id']) if recommended_engineers else None
-            recommended_driver_id = str(recommended_drivers[0]['_id']) if recommended_drivers else None
-
-            return render_template(
-                'warehouse/assign_cluster.html',
-                cluster=cluster,
-                engineers=engineers_sorted,
-                drivers=drivers_sorted,
-                doctors=doctors,
-                recommended_engineers=recommended_engineers,
-                recommended_drivers=recommended_drivers,
-                recommended_engineer_id=recommended_engineer_id,
-                recommended_driver_id=recommended_driver_id
-            )
-
-        @warehouse_bp.route('/assign', methods=['POST'])
-        def assign_cluster():
-            cluster_id = request.form.get('cluster_id')
-            eng_id = request.form.get('engineer_id')
-            driver_id = request.form.get('driver_id')
-            doctor_id = request.form.get('doctor_id')
-            est_minutes = int(request.form.get('estimated_duration_minutes') or 60)
-            route_km = float(request.form.get('route_distance_km') or 5.0)
-            scheduled_for = datetime.utcnow()
-
-            update = {
-                'engineer_id': eng_id,
-                'driver_id': driver_id,
-                'doctor_id': doctor_id,
-                'status': 'scheduled',
-                'scheduled_for': scheduled_for,
-                'estimated_duration_minutes': est_minutes,
-                'route_distance_km': route_km
-            }
-
-            # compute and set destination if not present
-            cluster = mongo.db.collection_clusters.find_one({'_id': ObjectId(cluster_id)})
-            lat = None
-            lng = None
-            if cluster:
-                if cluster.get('anchor_location'):
-                    lat = cluster['anchor_location'].get('lat')
-                    lng = cluster['anchor_location'].get('lng')
-                else:
-                    user_ids = [u['user_id'] for u in cluster.get('users', [])]
-                    if user_ids:
-                        pickup_docs = list(mongo.db.pickup_requests.find({'_id': {'$in': user_ids}}))
-                        if pickup_docs:
-                            lat = sum([p.get('latitude', 0) for p in pickup_docs]) / len(pickup_docs)
-                            lng = sum([p.get('longitude', 0) for p in pickup_docs]) / len(pickup_docs)
-
-            if lat is not None and lng is not None:
-                nearest_wh = min(WAREHOUSES, key=lambda wh: haversine_km(lat, lng, wh['lat'], wh['lng']))
-                dist_to_wh = round(haversine_km(lat, lng, nearest_wh['lat'], nearest_wh['lng']), 2)
-                update['destination'] = nearest_wh['name']
-                update['dist_to_hub'] = dist_to_wh
-
-            mongo.db.collection_clusters.update_one({'_id': ObjectId(cluster_id)}, {'$set': update})
-
-            # Update pickup_requests linked to this cluster: set status scheduled
-            try:
-                mongo.db.pickup_requests.update_many({'cluster_id': str(cluster_id)}, {'$set': {'status': 'scheduled'}})
-            except Exception:
-                pass
-
-            return redirect(url_for('warehouse.dashboard'))
         cid = mongo.db.collection_clusters.insert_one(cluster).inserted_id
 
         mongo.db.pickup_requests.update_many(
@@ -443,6 +335,127 @@ def analyze_routes():
         created.append(str(cid))
 
     return redirect(url_for("warehouse.dashboard"))
+
+
+@warehouse_bp.route('/assign/<cluster_id>', methods=['GET'])
+def assign_cluster_page(cluster_id):
+    # Render a simple assignment page for a cluster
+    cluster = mongo.db.collection_clusters.find_one({'_id': ObjectId(cluster_id)})
+    if not cluster:
+        return redirect(url_for('warehouse.dashboard'))
+
+    # Fetch available engineers/drivers/doctors
+    engineers = list(mongo.db.users.find({'role': 'engineer'}))
+    drivers = list(mongo.db.users.find({'role': 'driver'}))
+    doctors = list(mongo.db.users.find({'role': 'doctor'}))
+
+    # Determine cluster centroid (anchor or centroid of users)
+    lat = None
+    lng = None
+    if cluster.get('anchor_location'):
+        lat = cluster['anchor_location'].get('lat')
+        lng = cluster['anchor_location'].get('lng')
+    else:
+        user_ids = [u['user_id'] for u in cluster.get('users', [])]
+        if user_ids:
+            pickup_docs = list(mongo.db.pickup_requests.find({'_id': {'$in': user_ids}}))
+            if pickup_docs:
+                lat = sum([p.get('latitude', 0) for p in pickup_docs]) / len(pickup_docs)
+                lng = sum([p.get('longitude', 0) for p in pickup_docs]) / len(pickup_docs)
+
+    # Only show engineers who are available_tomorrow or currently not on route
+    active_engineer_ids = mongo.db.collection_clusters.distinct('engineer_id', {'status': {'$in': ['in_progress', 'assigned', 'scheduled']}})
+    for eng in engineers:
+        eng['on_route'] = str(eng['_id']) in active_engineer_ids
+        eng['available_tomorrow'] = eng.get('available_tomorrow', True)
+        # compute current active assignment count for workload-based recommendation
+        try:
+            eng_count = mongo.db.collection_clusters.count_documents({'engineer_id': str(eng['_id']), 'status': {'$in': ['assigned', 'in_progress', 'scheduled']}})
+        except Exception:
+            eng_count = 0
+        eng['active_count'] = eng_count
+
+    for drv in drivers:
+        try:
+            drv_count = mongo.db.collection_clusters.count_documents({'driver_id': str(drv['_id']), 'status': {'$in': ['assigned', 'in_progress', 'scheduled']}})
+        except Exception:
+            drv_count = 0
+        drv['active_count'] = drv_count
+
+    # Sort by availability then by active_count (less loaded first)
+    engineers_sorted = sorted(engineers, key=lambda p: (0 if p.get('available_tomorrow', True) else 1, p.get('active_count', 0)))
+    drivers_sorted = sorted(drivers, key=lambda p: (0 if p.get('available_tomorrow', True) else 1, p.get('active_count', 0)))
+
+    # Prepare recommended (top 5)
+    recommended_engineers = engineers_sorted[:5]
+    recommended_drivers = drivers_sorted[:5]
+
+    recommended_engineer_id = str(recommended_engineers[0]['_id']) if recommended_engineers else None
+    recommended_driver_id = str(recommended_drivers[0]['_id']) if recommended_drivers else None
+
+    return render_template(
+        'warehouse/assign_cluster.html',
+        cluster=cluster,
+        engineers=engineers_sorted,
+        drivers=drivers_sorted,
+        doctors=doctors,
+        recommended_engineers=recommended_engineers,
+        recommended_drivers=recommended_drivers,
+        recommended_engineer_id=recommended_engineer_id,
+        recommended_driver_id=recommended_driver_id
+    )
+
+@warehouse_bp.route('/assign', methods=['POST'])
+def assign_cluster():
+    cluster_id = request.form.get('cluster_id')
+    eng_id = request.form.get('engineer_id')
+    driver_id = request.form.get('driver_id')
+    doctor_id = request.form.get('doctor_id')
+    est_minutes = int(request.form.get('estimated_duration_minutes') or 60)
+    route_km = float(request.form.get('route_distance_km') or 5.0)
+    scheduled_for = datetime.utcnow()
+
+    update = {
+        'engineer_id': eng_id,
+        'driver_id': driver_id,
+        'doctor_id': doctor_id,
+        'status': 'scheduled',
+        'scheduled_for': scheduled_for,
+        'estimated_duration_minutes': est_minutes,
+        'route_distance_km': route_km
+    }
+
+    # compute and set destination if not present
+    cluster = mongo.db.collection_clusters.find_one({'_id': ObjectId(cluster_id)})
+    lat = None
+    lng = None
+    if cluster:
+        if cluster.get('anchor_location'):
+            lat = cluster['anchor_location'].get('lat')
+            lng = cluster['anchor_location'].get('lng')
+        else:
+            user_ids = [u['user_id'] for u in cluster.get('users', [])]
+            if user_ids:
+                pickup_docs = list(mongo.db.pickup_requests.find({'_id': {'$in': user_ids}}))
+                if pickup_docs:
+                    lat = sum([p.get('latitude', 0) for p in pickup_docs]) / len(pickup_docs)
+                    lng = sum([p.get('longitude', 0) for p in pickup_docs]) / len(pickup_docs)
+
+    if lat is not None and lng is not None:
+        nearest_wh = min(WAREHOUSES, key=lambda wh: haversine_km(lat, lng, wh['lat'], wh['lng']))
+        dist_to_wh = round(haversine_km(lat, lng, nearest_wh['lat'], nearest_wh['lng']), 2)
+        update['destination'] = nearest_wh['name']
+        update['dist_to_hub'] = dist_to_wh
+
+    mongo.db.collection_clusters.update_one({'_id': ObjectId(cluster_id)}, {'$set': update})
+
+    # Update pickup_requests linked to this cluster: set status scheduled
+    try:
+        mongo.db.pickup_requests.update_many({'cluster_id': str(cluster_id)}, {'$set': {'status': 'scheduled'}})
+    except Exception:
+        pass
+
+    return redirect(url_for('warehouse.dashboard'))
 
 
 # ---------------- ADMIN OVERRIDE ----------------

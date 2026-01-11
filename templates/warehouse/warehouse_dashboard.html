@@ -82,7 +82,7 @@
 <!-- Workforce Monitoring -->
 <div class="mb-10 fade-in-up" style="animation-delay: 400ms;">
     <h2 class="text-2xl font-bold text-[#005461] mb-6">Workforce Overview</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
         <!-- Engineers & Drivers -->
         <div class="glass p-6 rounded-2xl shadow-sm border border-white/50">
             <h3 class="text-lg font-bold text-[#005461] mb-4">🚛 Fleet (Engineers & Drivers)</h3>
@@ -103,6 +103,24 @@
                 <li class="flex justify-between items-center p-3 bg-white/40 rounded-xl border border-white/50">
                     <span class="font-medium text-gray-700">{{ rec.name }}</span>
                     <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Processing</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        <!-- Leaderboard -->
+        <div class="glass p-6 rounded-2xl shadow-sm border border-white/50">
+            <h3 class="text-lg font-bold text-[#005461] mb-4">🏆 Top Contributors</h3>
+            <ul class="space-y-3">
+                {% for user in stats.leaderboard %}
+                <li class="flex justify-between items-center p-3 rounded-xl {% if loop.index == 1 %}bg-yellow-50 border border-yellow-200{% else %}bg-white/40 border border-white/50{% endif %}">
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                            {% if loop.index == 1 %}bg-yellow-400 text-white{% elif loop.index == 2 %}bg-gray-300 text-gray-700{% elif loop.index == 3 %}bg-orange-300 text-white{% else %}bg-gray-100 text-gray-500{% endif %}">
+                            {{ loop.index }}
+                        </span>
+                        <span class="font-medium text-gray-700 text-sm">{{ user._id or 'Anonymous' }}</span>
+                    </div>
+                    <span class="font-mono text-[#005461] font-bold text-sm">{{ user.total_weight }}g</span>
                 </li>
                 {% endfor %}
             </ul>
@@ -236,6 +254,35 @@
       <h4 class="font-semibold text-gray-700">Destination</h4>
       <p class="text-sm text-blue-600 font-semibold">{{ cluster.destination }}</p>
     </div>
+  </div>
+
+  <!-- Route Manifest Table -->
+  <div class="px-6 pb-6">
+      <h4 class="font-bold text-gray-400 mb-3 text-xs uppercase tracking-widest">Route Manifest</h4>
+      <div class="overflow-x-auto rounded-lg border border-gray-100">
+          <table class="w-full text-sm text-left">
+              <thead class="bg-gray-50 text-gray-500">
+                  <tr>
+                      <th class="px-4 py-2">User</th>
+                      <th class="px-4 py-2">Address</th>
+                      <th class="px-4 py-2">Category</th>
+                      <th class="px-4 py-2">Weight</th>
+                      <th class="px-4 py-2">Dist.</th>
+                  </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                  {% for u in cluster.user_details %}
+                  <tr class="hover:bg-gray-50 transition">
+                      <td class="px-4 py-2 font-medium text-gray-900">{{ u.name }}</td>
+                      <td class="px-4 py-2 text-gray-600 truncate max-w-xs">{{ u.address }}</td>
+                      <td class="px-4 py-2 text-blue-600 font-medium">{{ u.type }}</td>
+                      <td class="px-4 py-2 font-mono text-[#005461]">{{ u.weight }} g</td>
+                      <td class="px-4 py-2 text-gray-500">{{ u.distance }} km</td>
+                  </tr>
+                  {% endfor %}
+              </tbody>
+          </table>
+      </div>
   </div>
 
 </div>
